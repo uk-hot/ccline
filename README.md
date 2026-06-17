@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh.md)
 
-> **Fork notice / Fork 说明**: This repository is a fork of [Haleclipse/CCometixLine](https://github.com/Haleclipse/CCometixLine) (MIT). On top of the original, it **adds a prompt cache hit-rate to the context window segment** (e.g. `⚡ 10.1% · 20.1k tokens · cache 89.6%`). Install via npm: `npm install -g @uk-hot/ccline`. All other behavior is unchanged from upstream.
+> **Fork notice / Fork 说明**: This repository is a fork of [Haleclipse/CCometixLine](https://github.com/Haleclipse/CCometixLine) (MIT). On top of the original, it **adds a cumulative prompt cache ratio to the context window segment** — `Σcache_read / Σ(input + cache_creation + cache_read)` across the whole session (e.g. `⚡ 20.0% · 40.1k tokens · cache 96.4%`). Install via npm: `npm install -g @uk-hot/ccline`. All other behavior is unchanged from upstream.
 
 A high-performance Claude Code statusline tool written in Rust with Git integration, usage tracking, interactive TUI configuration, and Claude Code enhancement utilities.
 
