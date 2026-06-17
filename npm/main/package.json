@@ -1,0 +1,30 @@
+{
+  "name": "@uk-hot/ccline",
+  "version": "0.0.0",
+  "description": "CCometixLine fork — high-performance Claude Code statusline, with prompt cache hit-rate added to the context window segment.",
+  "bin": {
+    "ccline": "./bin/ccline.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "optionalDependencies": {
+    "@uk-hot/ccline-darwin-x64": "0.0.0",
+    "@uk-hot/ccline-darwin-arm64": "0.0.0",
+    "@uk-hot/ccline-linux-x64": "0.0.0",
+    "@uk-hot/ccline-linux-x64-musl": "0.0.0",
+    "@uk-hot/ccline-linux-arm64": "0.0.0",
+    "@uk-hot/ccline-linux-arm64-musl": "0.0.0",
+    "@uk-hot/ccline-win32-x64": "0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uk-hot/ccline"
+  },
+  "keywords": ["claude", "statusline", "claude-code", "rust", "cli", "cache", "cache-hit"],
+  "author": "uk-hot (fork of CCometixLine by Haleclipse)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

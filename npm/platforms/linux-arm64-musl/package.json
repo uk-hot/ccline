@@ -1,0 +1,14 @@
+{
+  "name": "@uk-hot/ccline-linux-arm64-musl",
+  "version": "0.0.0",
+  "description": "Linux ARM64 binary (musl) for CCometixLine",
+  "files": ["ccline"],
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uk-hot/ccline"
+  },
+  "author": "Haleclipse",
+  "license": "MIT"
+}
