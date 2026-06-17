@@ -72,29 +72,20 @@ impl Segment for ContextWindowSegment {
         metadata.insert("limit".to_string(), context_limit.to_string());
         metadata.insert("model".to_string(), input.model.id.clone());
 
-        // Cache hit rate of the latest assistant turn:
-        // cache_read / (input + cache_creation + cache_read)
-        let cache_hit_display = match usage_opt.as_ref() {
-            Some(u) => {
-                let denom =
-                    u.input_tokens + u.cache_creation_input_tokens + u.cache_read_input_tokens;
-                if denom > 0 {
-                    let rate = (u.cache_read_input_tokens as f64 / denom as f64) * 100.0;
-                    metadata.insert("cache_hit_rate".to_string(), rate.to_string());
-                    metadata.insert(
-                        "cache_read_tokens".to_string(),
-                        u.cache_read_input_tokens.to_string(),
-                    );
-                    if rate.fract() == 0.0 {
-                        format!("{:.0}%", rate)
-                    } else {
-                        format!("{:.1}%", rate)
-                    }
+        // Cumulative cache ratio across all assistant turns in the session:
+        // Σ cache_read / Σ (input + cache_creation + cache_read)
+        let cache_hit_display = match accumulate_cache_ratio(Path::new(&input.transcript_path)) {
+            Some((cache_read, denom)) if denom > 0 => {
+                let rate = (cache_read as f64 / denom as f64) * 100.0;
+                metadata.insert("cache_hit_rate".to_string(), rate.to_string());
+                metadata.insert("cache_read_tokens".to_string(), cache_read.to_string());
+                if rate.fract() == 0.0 {
+                    format!("{:.0}%", rate)
                 } else {
-                    "-".to_string()
+                    format!("{:.1}%", rate)
                 }
             }
-            None => "-".to_string(),
+            _ => "-".to_string(),
         };
 
         Some(SegmentData {
@@ -298,4 +289,77 @@ fn try_find_usage_from_project_history(transcript_path: &Path) -> Option<Normali
     }
 
     None
+}
+
+/// Accumulate the cache ratio across all assistant turns in the session.
+/// Returns (total_cache_read, total_input_side_tokens).
+fn accumulate_cache_ratio(path: &Path) -> Option<(u64, u64)> {
+    if let Some(r) = accumulate_cache_in_file(path) {
+        return Some(r);
+    }
+
+    // Fallback: most recent session file in the project directory
+    if !path.exists() {
+        let project_dir = path.parent()?;
+        let mut session_files: Vec<PathBuf> = Vec::new();
+        for entry in fs::read_dir(project_dir).ok()? {
+            let entry = entry.ok()?;
+            let p = entry.path();
+            if p.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                session_files.push(p);
+            }
+        }
+        session_files.sort_by_key(|p| {
+            fs::metadata(p)
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::UNIX_EPOCH)
+        });
+        session_files.reverse();
+        for sp in &session_files {
+            if let Some(r) = accumulate_cache_in_file(sp) {
+                return Some(r);
+            }
+        }
+    }
+
+    None
+}
+
+/// Sum cache_read and the input-side denominator over every assistant message in a file.
+fn accumulate_cache_in_file(path: &Path) -> Option<(u64, u64)> {
+    let file = fs::File::open(path).ok()?;
+    let reader = BufReader::new(file);
+
+    let mut cache_read: u64 = 0;
+    let mut denom: u64 = 0;
+
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if let Ok(entry) = serde_json::from_str::<TranscriptEntry>(line) {
+            if entry.r#type.as_deref() == Some("assistant") {
+                if let Some(message) = &entry.message {
+                    if let Some(raw_usage) = &message.usage {
+                        let n = raw_usage.clone().normalize();
+                        cache_read += n.cache_read_input_tokens as u64;
+                        denom += (n.input_tokens
+                            + n.cache_creation_input_tokens
+                            + n.cache_read_input_tokens) as u64;
+                    }
+                }
+            }
+        }
+    }
+
+    if denom == 0 {
+        return None;
+    }
+    Some((cache_read, denom))
 }
