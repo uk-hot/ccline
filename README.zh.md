@@ -2,6 +2,13 @@
 
 [English](README.md) | [中文](README.zh.md)
 
+> **Fork 说明**：本仓库 fork 自 [Haleclipse/CCometixLine](https://github.com/Haleclipse/CCometixLine)（MIT）。在上游基础上新增两项：
+>
+> 1. **上下文窗口段的累计 prompt 缓存命中率** —— 整个会话的 `Σcache_read / Σ(input + cache_creation + cache_read)`（例如 `⚡ 20.0% · 40.1k tokens · cache 96.4%`）。
+> 2. **第二行状态栏显示剩余额度** —— 当前会话（5 小时）与本周（7 天）的剩余额度，并各带本地重置时间（例如 `📊 Session 34% 🔄 17:20   Week 59% 🔄 6/21 23:00`）。
+>
+> 通过 npm 安装：`npm install -g @uk-hot/ccline`。其余行为与上游一致。
+
 基于 Rust 的高性能 Claude Code 状态栏工具，集成 Git 信息、使用量跟踪、交互式 TUI 配置和 Claude Code 补丁工具。
 
 ![Language:Rust](https://img.shields.io/static/v1?label=Language&message=Rust&color=orange&style=flat-square)
@@ -34,6 +41,30 @@
 - **启用详细模式** 增强输出详细信息
 - **稳定补丁器** 适应 Claude Code 版本更新
 - **自动备份** 安全修改，支持轻松恢复
+
+### Fork 新增功能（`@uk-hot/ccline`）
+
+本 fork 额外提供两项显示功能，`default` 与 `cometix` 主题默认开启：
+
+- **Prompt 缓存命中率**：追加到上下文窗口段，为整个会话的累计 `cache_read / (input + cache_creation + cache_read)` 比例。
+- **第二行状态栏显示剩余额度**：`usage` 段从 `/api/oauth/usage` 拉取套餐用量，显示当前 5 小时会话与 7 天周期的剩余额度，并各带本地重置时间：
+
+  ```
+  🤖 Opus 4.8 | 📁 myproject | ⚡ 20.0% · 40.1k tokens · cache 96.4%
+  📊 Session 34% 🔄 17:20   Week 59% 🔄 6/21 23:00
+  ```
+
+  剩余百分比按高低着色（绿 / 黄 / 红）。数据本地缓存于 `~/.claude/ccline/.api_usage_cache.json`（默认 TTL 180 秒），并具备容错：接口不可用时复用上次缓存，若无缓存则仅隐藏第二行，绝不影响第一行。
+
+  **多行布局**由每个段的 `line` 选项控制（默认 `1`），写在 `[segments.options]` 下。把任意段放到第二行只需 `line = 2`：
+
+  ```toml
+  [[segments]]
+  id = "usage"
+  enabled = true
+  [segments.options]
+  line = 2
+  ```
 
 ## 安装
 

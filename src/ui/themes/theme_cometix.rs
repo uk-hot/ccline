@@ -136,19 +136,23 @@ pub fn output_style_segment() -> SegmentConfig {
 pub fn usage_segment() -> SegmentConfig {
     SegmentConfig {
         id: SegmentId::Usage,
-        enabled: false,
+        enabled: true,
         icon: IconConfig {
             plain: "📊".to_string(),
             nerd_font: "\u{f0a9e}".to_string(),
         },
         colors: ColorConfig {
             icon: Some(AnsiColor::Color16 { c16: 14 }),
-            text: Some(AnsiColor::Color16 { c16: 14 }),
+            // Text color is left unset; the segment self-colors session/week
+            // percentages (green/yellow/red) inline.
+            text: None,
             background: None,
         },
         styles: TextStyleConfig::default(),
         options: {
             let mut opts = HashMap::new();
+            // Render this segment on the second status line.
+            opts.insert("line".to_string(), serde_json::Value::Number(2.into()));
             opts.insert(
                 "api_base_url".to_string(),
                 serde_json::Value::String("https://api.anthropic.com".to_string()),

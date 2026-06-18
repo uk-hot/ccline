@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.5] - 2026-06-18
+
+> Fork release (`@uk-hot/ccline`).
+
+### Added
+- **Second status line with remaining usage quota**: the `usage` segment now renders the remaining quota for the current 5-hour session and the 7-day week, each with its local reset time, e.g. `📊 Session 34% 🔄 17:20   Week 59% 🔄 6/21 23:00`. Remaining percentages are colored green/yellow/red as they run low.
+- **Per-segment multi-line layout**: segments can be placed on additional status lines via a `line` option (default `1`) under `[segments.options]`. The `usage` segment is enabled on `line = 2` by default in the `default` and `cometix` themes.
+
+### Changed
+- The `usage` segment now reports **remaining** quota (`100 − utilization`) for both periods and caches both reset timestamps, instead of only the 5-hour utilization.
+
 ## [1.1.2] - 2026-03-15
 
 ### Changed

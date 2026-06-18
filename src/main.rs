@@ -67,9 +67,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Collect segment data
     let segments_data = collect_all_segments(&config, &input);
 
-    // Render statusline
+    // Render statusline (multi-line: segments are grouped by their `line` option)
     let generator = StatusLineGenerator::new(config);
-    let statusline = generator.generate(segments_data);
+    let statusline = generator.generate_multiline(segments_data);
 
     println!("{}", statusline);
 

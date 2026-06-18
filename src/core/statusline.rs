@@ -39,11 +39,44 @@ impl StatusLineGenerator {
     }
 
     pub fn generate(&self, segments: Vec<(SegmentConfig, SegmentData)>) -> String {
-        let mut output = Vec::new();
         let enabled_segments: Vec<_> = segments
             .into_iter()
             .filter(|(config, _)| config.enabled)
             .collect();
+
+        self.render_line(&enabled_segments)
+    }
+
+    /// Generate a multi-line statusline. Segments are grouped by their
+    /// `options.line` value (default 1) and each group is rendered as one
+    /// line; lines are joined with '\n' in ascending line order.
+    pub fn generate_multiline(&self, segments: Vec<(SegmentConfig, SegmentData)>) -> String {
+        use std::collections::BTreeMap;
+
+        let mut groups: BTreeMap<u64, Vec<(SegmentConfig, SegmentData)>> = BTreeMap::new();
+        for (config, data) in segments.into_iter().filter(|(c, _)| c.enabled) {
+            let line = config
+                .options
+                .get("line")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1);
+            groups.entry(line).or_default().push((config, data));
+        }
+
+        let mut lines = Vec::new();
+        for (_, group) in groups {
+            let rendered = self.render_line(&group);
+            if !rendered.is_empty() {
+                lines.push(rendered);
+            }
+        }
+
+        lines.join("\n")
+    }
+
+    /// Render a single line from a list of already-enabled segments.
+    fn render_line(&self, enabled_segments: &[(SegmentConfig, SegmentData)]) -> String {
+        let mut output = Vec::new();
 
         for (config, data) in enabled_segments.iter() {
             let rendered = self.render_segment(config, data);
@@ -58,7 +91,7 @@ impl StatusLineGenerator {
 
         // Handle Powerline arrow separators with color transition
         if self.config.style.separator == "\u{e0b0}" {
-            self.join_with_powerline_arrows(&output, &enabled_segments)
+            self.join_with_powerline_arrows(&output, enabled_segments)
         } else {
             // For all other separators, use white color and simple join
             self.join_with_white_separators(&output)

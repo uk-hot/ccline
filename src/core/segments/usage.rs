@@ -1,7 +1,7 @@
 use super::{Segment, SegmentData};
 use crate::config::{InputData, SegmentId};
 use crate::utils::credentials;
-use chrono::{DateTime, Datelike, Duration, Local, Timelike, Utc};
+use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -19,8 +19,16 @@ struct UsagePeriod {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ApiUsageCache {
+    #[serde(default)]
     five_hour_utilization: f64,
+    #[serde(default)]
     seven_day_utilization: f64,
+    #[serde(default)]
+    five_hour_resets_at: Option<String>,
+    #[serde(default)]
+    seven_day_resets_at: Option<String>,
+    // Legacy single field (seven_day reset), kept for backward compatibility
+    #[serde(default)]
     resets_at: Option<String>,
     cached_at: String,
 }
@@ -33,33 +41,36 @@ impl UsageSegment {
         Self
     }
 
-    fn get_circle_icon(utilization: f64) -> String {
-        let percent = (utilization * 100.0) as u8;
-        match percent {
-            0..=12 => "\u{f0a9e}".to_string(),  // circle_slice_1
-            13..=25 => "\u{f0a9f}".to_string(), // circle_slice_2
-            26..=37 => "\u{f0aa0}".to_string(), // circle_slice_3
-            38..=50 => "\u{f0aa1}".to_string(), // circle_slice_4
-            51..=62 => "\u{f0aa2}".to_string(), // circle_slice_5
-            63..=75 => "\u{f0aa3}".to_string(), // circle_slice_6
-            76..=87 => "\u{f0aa4}".to_string(), // circle_slice_7
-            _ => "\u{f0aa5}".to_string(),       // circle_slice_8
+    /// ANSI color (foreground) for a remaining-quota percentage:
+    /// green when plenty left, yellow when getting low, red when nearly out.
+    fn remaining_color(remaining: u8) -> &'static str {
+        if remaining >= 50 {
+            "\x1b[92m" // bright green
+        } else if remaining >= 20 {
+            "\x1b[93m" // bright yellow
+        } else {
+            "\x1b[91m" // bright red
         }
     }
 
-    fn format_reset_time(reset_time_str: Option<&str>) -> String {
+    /// Format a reset timestamp in local time.
+    /// `with_date = false` -> "HH:MM" (for the 5h window, always today)
+    /// `with_date = true`  -> "M/D HH:MM" (for the 7d window, days away)
+    fn format_reset_time(reset_time_str: Option<&str>, with_date: bool) -> String {
         if let Some(time_str) = reset_time_str {
             if let Ok(dt) = DateTime::parse_from_rfc3339(time_str) {
-                let mut local_dt = dt.with_timezone(&Local);
-                if local_dt.minute() > 45 {
-                    local_dt += Duration::hours(1);
-                }
-                return format!(
-                    "{}-{}-{}",
-                    local_dt.month(),
-                    local_dt.day(),
-                    local_dt.hour()
-                );
+                let local_dt = dt.with_timezone(&Local);
+                return if with_date {
+                    format!(
+                        "{}/{} {:02}:{:02}",
+                        local_dt.month(),
+                        local_dt.day(),
+                        local_dt.hour(),
+                        local_dt.minute()
+                    )
+                } else {
+                    format!("{:02}:{:02}", local_dt.hour(), local_dt.minute())
+                };
             }
         }
         "?".to_string()
@@ -209,12 +220,14 @@ impl Segment for UsageSegment {
             .map(|cache| self.is_cache_valid(cache, cache_duration))
             .unwrap_or(false);
 
-        let (five_hour_util, seven_day_util, resets_at) = if use_cached {
+        let (five_hour_util, seven_day_util, five_hour_resets, seven_day_resets) = if use_cached {
             let cache = cached_data.unwrap();
+            let seven_day_resets = cache.seven_day_resets_at.or(cache.resets_at);
             (
                 cache.five_hour_utilization,
                 cache.seven_day_utilization,
-                cache.resets_at,
+                cache.five_hour_resets_at,
+                seven_day_resets,
             )
         } else {
             match self.fetch_api_usage(api_base_url, &token, timeout) {
@@ -222,6 +235,8 @@ impl Segment for UsageSegment {
                     let cache = ApiUsageCache {
                         five_hour_utilization: response.five_hour.utilization,
                         seven_day_utilization: response.seven_day.utilization,
+                        five_hour_resets_at: response.five_hour.resets_at.clone(),
+                        seven_day_resets_at: response.seven_day.resets_at.clone(),
                         resets_at: response.seven_day.resets_at.clone(),
                         cached_at: Utc::now().to_rfc3339(),
                     };
@@ -229,15 +244,18 @@ impl Segment for UsageSegment {
                     (
                         response.five_hour.utilization,
                         response.seven_day.utilization,
+                        response.five_hour.resets_at,
                         response.seven_day.resets_at,
                     )
                 }
                 None => {
                     if let Some(cache) = cached_data {
+                        let seven_day_resets = cache.seven_day_resets_at.or(cache.resets_at);
                         (
                             cache.five_hour_utilization,
                             cache.seven_day_utilization,
-                            cache.resets_at,
+                            cache.five_hour_resets_at,
+                            seven_day_resets,
                         )
                     } else {
                         return None;
@@ -246,13 +264,23 @@ impl Segment for UsageSegment {
             }
         };
 
-        let dynamic_icon = Self::get_circle_icon(seven_day_util / 100.0);
-        let five_hour_percent = five_hour_util.round() as u8;
-        let primary = format!("{}%", five_hour_percent);
-        let secondary = format!("· {}", Self::format_reset_time(resets_at.as_deref()));
+        // Remaining quota = 100 - utilization, clamped to [0, 100].
+        let session_remaining = (100.0 - five_hour_util).round().clamp(0.0, 100.0) as u8;
+        let week_remaining = (100.0 - seven_day_util).round().clamp(0.0, 100.0) as u8;
+
+        // Dedicated second-line layout: "Session 40% 🔄 17:20   Week 59% 🔄 6/21 23:00"
+        let primary = format!(
+            "Session {sc}{s}%\x1b[0m \x1b[90m🔄 {sr}\x1b[0m   \
+             Week {wc}{w}%\x1b[0m \x1b[90m🔄 {wr}\x1b[0m",
+            sc = Self::remaining_color(session_remaining),
+            s = session_remaining,
+            sr = Self::format_reset_time(five_hour_resets.as_deref(), false),
+            wc = Self::remaining_color(week_remaining),
+            w = week_remaining,
+            wr = Self::format_reset_time(seven_day_resets.as_deref(), true),
+        );
 
         let mut metadata = HashMap::new();
-        metadata.insert("dynamic_icon".to_string(), dynamic_icon);
         metadata.insert(
             "five_hour_utilization".to_string(),
             five_hour_util.to_string(),
@@ -261,10 +289,15 @@ impl Segment for UsageSegment {
             "seven_day_utilization".to_string(),
             seven_day_util.to_string(),
         );
+        metadata.insert(
+            "session_remaining".to_string(),
+            session_remaining.to_string(),
+        );
+        metadata.insert("week_remaining".to_string(), week_remaining.to_string());
 
         Some(SegmentData {
             primary,
-            secondary,
+            secondary: String::new(),
             metadata,
         })
     }
