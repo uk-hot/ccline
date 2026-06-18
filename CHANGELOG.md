@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2026-06-18
+
+> Fork release (`@uk-hot/ccline`).
+
+### Changed
+- **Usage refresh interval raised to 10 minutes** (`cache_duration = 600`) in the `default` and `cometix` themes, reducing how often the `/api/oauth/usage` endpoint is queried. The second line still updates whenever the statusline re-renders and the cache has expired.
+
 ## [1.1.5] - 2026-06-18
 
 > Fork release (`@uk-hot/ccline`).

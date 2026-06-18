@@ -105,7 +105,7 @@ pub fn usage_segment() -> SegmentConfig {
             );
             opts.insert(
                 "cache_duration".to_string(),
-                serde_json::Value::Number(180.into()),
+                serde_json::Value::Number(600.into()), // refresh usage at most every 10 min
             );
             opts.insert("timeout".to_string(), serde_json::Value::Number(2.into()));
             opts
