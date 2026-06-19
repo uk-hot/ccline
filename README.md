@@ -5,7 +5,7 @@
 > **Fork notice / Fork 说明**: This repository is a fork of [Haleclipse/CCometixLine](https://github.com/Haleclipse/CCometixLine) (MIT). On top of the original it adds two things:
 >
 > 1. **Cumulative prompt cache ratio** in the context window segment — `Σcache_read / Σ(input + cache_creation + cache_read)` across the whole session (e.g. `⚡ 20.0% · 40.1k tokens · cache 96.4%`).
-> 2. **A second status line showing remaining usage quota** — the current session (5-hour) and weekly (7-day) quota left, each with its local reset time (e.g. `📊 Session 34% 🔄 17:20   Week 59% 🔄 6/21 23:00`).
+> 2. **A second status line showing usage** — how much of the current session (5-hour) and weekly (7-day) limits has been used (the same percentages as Claude Code's `/usage`), each with its local reset time (e.g. `📊 Session 4% 🔄 17:20   Week 29% 🔄 6/21 23:00`).
 >
 > Install via npm: `npm install -g @uk-hot/ccline`. All other behavior is unchanged from upstream.
 
@@ -47,14 +47,14 @@ The statusline shows: Model | Directory | Git Branch Status | Context Window Inf
 This fork ships two extra display features, both enabled by default in the `default` and `cometix` themes:
 
 - **Prompt cache hit-rate** appended to the Context Window segment — the cumulative `cache_read / (input + cache_creation + cache_read)` ratio across the whole session.
-- **A second status line with remaining usage quota.** The `usage` segment fetches your plan usage from `/api/oauth/usage` and renders how much of the current 5-hour session and the 7-day week you have left, each with its local reset time:
+- **A second status line with plan usage.** The `usage` segment fetches your plan usage from `/api/oauth/usage` and renders how much of the current 5-hour session and the 7-day week you have used — the same percentages shown by Claude Code's `/usage` — each with its local reset time:
 
   ```
   🤖 Opus 4.8 | 📁 myproject | ⚡ 20.0% · 40.1k tokens · cache 96.4%
-  📊 Session 34% 🔄 17:20   Week 59% 🔄 6/21 23:00
+  📊 Session 4% 🔄 17:20   Week 29% 🔄 6/21 23:00
   ```
 
-  Remaining percentages are colored green / yellow / red as they run low. The data is cached locally (`~/.claude/ccline/.api_usage_cache.json`, default TTL 180s) and degrades gracefully: if the API is unreachable the last cached value is reused, and if there is none the second line is simply omitted — the first line is never affected.
+  Percentages are colored by how much is left — green when plenty remains, yellow/red as you approach the limit. The data is cached locally (`~/.claude/ccline/.api_usage_cache.json`, default TTL 180s) and degrades gracefully: if the API is unreachable the last cached value is reused, and if there is none the second line is simply omitted — the first line is never affected.
 
   **Multi-line layout** is controlled per-segment by a `line` option (default `1`) inside `[segments.options]`. Put any segment on the second line with `line = 2`:
 

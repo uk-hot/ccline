@@ -264,19 +264,22 @@ impl Segment for UsageSegment {
             }
         };
 
-        // Remaining quota = 100 - utilization, clamped to [0, 100].
-        let session_remaining = (100.0 - five_hour_util).round().clamp(0.0, 100.0) as u8;
-        let week_remaining = (100.0 - seven_day_util).round().clamp(0.0, 100.0) as u8;
+        // Display the *used* utilization (matching Claude Code's /usage), while
+        // coloring by how much is left (green = plenty, red = nearly out).
+        let session_used = five_hour_util.round().clamp(0.0, 100.0) as u8;
+        let week_used = seven_day_util.round().clamp(0.0, 100.0) as u8;
+        let session_remaining = 100u8.saturating_sub(session_used);
+        let week_remaining = 100u8.saturating_sub(week_used);
 
-        // Dedicated second-line layout: "Session 40% 🔄 17:20   Week 59% 🔄 6/21 23:00"
+        // Dedicated second-line layout: "Session 4% 🔄 17:20   Week 29% 🔄 6/21 23:00"
         let primary = format!(
             "Session {sc}{s}%\x1b[0m \x1b[90m🔄 {sr}\x1b[0m   \
              Week {wc}{w}%\x1b[0m \x1b[90m🔄 {wr}\x1b[0m",
             sc = Self::remaining_color(session_remaining),
-            s = session_remaining,
+            s = session_used,
             sr = Self::format_reset_time(five_hour_resets.as_deref(), false),
             wc = Self::remaining_color(week_remaining),
-            w = week_remaining,
+            w = week_used,
             wr = Self::format_reset_time(seven_day_resets.as_deref(), true),
         );
 
@@ -289,11 +292,8 @@ impl Segment for UsageSegment {
             "seven_day_utilization".to_string(),
             seven_day_util.to_string(),
         );
-        metadata.insert(
-            "session_remaining".to_string(),
-            session_remaining.to_string(),
-        );
-        metadata.insert("week_remaining".to_string(), week_remaining.to_string());
+        metadata.insert("session_used".to_string(), session_used.to_string());
+        metadata.insert("week_used".to_string(), week_used.to_string());
 
         Some(SegmentData {
             primary,
